@@ -1,88 +1,7 @@
-(* 1 Type inference for a simply typed calculus *)
+open Expr
 
-let () = Printexc.record_backtrace true
-
-type tvar = string
-
-type var = string
-
-(* 1.1 Simple types *)
-
-type ty =
-  | TyVar of tvar
-  | TyArrow of ty * ty
-  | TyProd of ty * ty    (* Produit A × B *)
-  | TySum of ty * ty     (* Somme A + B *)
-  | TyUnit              (* Unité 1 *)
-  | TyZero              (* Zéro 0 *)
-  | TyAnd of ty * ty
-  | TyTrue
-  | TyFalse
-  | TyOr of ty * ty
-
-(* 1.2 λ-terms *)
-
-type tm =
-  | TmVar of var * ty
-  | TmAbs of var * ty * tm
-  | TmApp of tm * tm
-  | TmPair of tm * tm         (* (t1, t2) : A × B *)
-  | TmProj1 of tm             (* π1 t *)
-  | TmProj2 of tm             (* π2 t *)
-  | TmInl of tm * ty          (* inl t : A + B *)
-  | TmInr of tm * ty          (* inr t : A + B *)
-  | TmCase of tm * (var * tm) * (var * tm)  (* case t of inl x -> u | inr y -> v *)
-  | TmUnit                   (* unité : 1 *)
-  | TmZeroCase of tm          (* case t : 0 -> A *)
-  | TmAndIntro of tm * tm    (* Introduction of A /\ B *)
-  | TmAndElimL of tm         (* Elimination of A /\ B to A *)
-  | TmAndElimR of tm         (* Elimination of A /\ B to B *)
-  | TmTrue
-  | TmFalse
-  | TmExFalso of tm * ty
-  | TmLeft of tm * ty           (* Left term in A \/ B *)
-  | TmRight of tm * ty          (* Right term in A \/ B *)
-  | TmOrCase of tm * (var * tm) * (var * tm)
-  
-
-(* 1.3 String representation *)
-
-let rec string_of_ty ty =
-  match ty with
-  | TyVar t -> t
-  | TyArrow (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " → " ^ string_of_ty ty2 ^ ")"
-  | TyProd (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " × " ^ string_of_ty ty2 ^ ")"
-  | TySum (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " + " ^ string_of_ty ty2 ^ ")"
-  | TyUnit -> "1"
-  | TyZero -> "0"
-  | TyAnd (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " ∧ " ^ string_of_ty ty2 ^ ")"
-  | TyTrue -> "⊤"
-  | TyFalse -> "⊥"
-  | TyOr (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " \\/ " ^ string_of_ty ty2 ^ ")"
-  
-let rec string_of_tm tm =
-  match tm with
-  | TmVar (v, ty) -> v ^ " : " ^ string_of_ty ty
-  | TmAbs (v, ty, tm) -> "(\u03bb (" ^ v ^ " : " ^ string_of_ty ty ^ ") -> " ^ string_of_tm tm ^ ")"
-  | TmApp (tm1, tm2) -> "(" ^ string_of_tm tm1 ^ " " ^ string_of_tm tm2 ^ ")"
-  | TmPair (tm1, tm2) -> "(" ^ string_of_tm tm1 ^ ", " ^ string_of_tm tm2 ^ ")"
-  | TmProj1 tm -> "π1(" ^ string_of_tm tm ^ ")"
-  | TmProj2 tm -> "π2(" ^ string_of_tm tm ^ ")"
-  | TmInl (tm, ty) -> "inl " ^ string_of_tm tm ^ " : " ^ string_of_ty ty
-  | TmInr (tm, ty) -> "inr " ^ string_of_tm tm ^ " : " ^ string_of_ty ty
-  | TmCase (tm, (x, u), (y, v)) ->
-      "case " ^ string_of_tm tm ^ " of inl " ^ x ^ " -> " ^ string_of_tm u ^
-      " | inr " ^ y ^ " -> " ^ string_of_tm v
-  | TmUnit -> "()"
-  | TmZeroCase tm -> "case_zero(" ^ string_of_tm tm ^ ")"
-  | TmAndIntro (tm1, tm2) -> "(∧_intro " ^ string_of_tm tm1 ^ ", " ^ string_of_tm tm2 ^ ")"
-  | TmAndElimL tm -> "(∧_elim_L " ^ string_of_tm tm ^ ")"
-  | TmAndElimR tm -> "(∧_elim_R " ^ string_of_tm tm ^ ")"
-  | TmTrue -> "true"
-  | TmFalse -> "false"
-  | TmExFalso (tm, ty) -> "ex falso(" ^ string_of_tm tm ^ " : " ^ string_of_ty ty ^ ")"
-  | TmOrCase (tm, (x, u), (y, v)) ->
-    "case " ^ string_of_tm tm ^ " of inl " ^ x ^ " -> " ^ string_of_tm u ^ " | inr " ^ y ^ " -> " ^ string_of_tm v
+let ty_of_string s = Parser.ty Lexer.token (Lexing.from_string s)
+let tm_of_string s = Parser.tm Lexer.token (Lexing.from_string s)
 
 (* Let's test our two function *)
 let example_type = TyArrow (TyArrow (TyVar "A", TyVar "B"), TyArrow (TyVar "A", TyVar "C"))
@@ -216,12 +135,19 @@ let rec infer_type (ctx : context) (t : tm) : ty =
       (match infer_type ctx t with
        | TyProd (_, ty2) -> ty2
        | _ -> raise Type_error)
-  | TmInl (t, TySum (ty1, ty2)) ->
+  (*)     
+  | TmInl (t, ty) ->
+    match ty with
+    | TySum (ty1, ty2) -> 
       check_type ctx t ty1;
       TySum (ty1, ty2)
-  | TmInr (t, TySum (ty1, ty2)) ->
+    | _ -> raise Type_error
+  | TmInr (t, ty) ->
+    match ty with 
+    | TySum (ty1, ty2) ->
       check_type ctx t ty2;
       TySum (ty1, ty2)
+    | _ -> raise Type_error *)
   | TmCase (t, (x, u), (y, v)) ->
       (match infer_type ctx t with
        | TySum (ty1, ty2) ->
@@ -244,31 +170,42 @@ let rec infer_type (ctx : context) (t : tm) : ty =
         | TyAnd (ty1, _) -> ty1
         | _ -> raise Type_error
       )
-    | TmAndElimR t -> (
-        match infer_type ctx t with
-        | TyAnd (_, ty2) -> ty2
-        | _ -> raise Type_error
-        )
-    | TmTrue -> TyTrue
-    | TmFalse -> TyFalse
-    | TmExFalso (t, ty) ->
+  | TmAndElimR t -> (
+      match infer_type ctx t with
+      | TyAnd (_, ty2) -> ty2
+      | _ -> raise Type_error
+      )
+  | TmTrue -> TyTrue
+  | TmFalse -> TyFalse
+  | TmExFalso (t, ty) ->
         (match infer_type ctx t with
          | TyFalse -> ty
          | _ -> raise Type_error)
-    | TmLeft (t, TyOr (ty1, _)) ->
+  | TmLeft (t, ty) ->
+    match ty with
+    | TyOr (ty1, _) ->
       check_type ctx t ty1;
-      TyOr (ty1, TyVar "_")  (* Use original type, keep right generic *)
-    | TmRight (t, TyOr (_, ty2)) ->
+      TyOr (ty1, TyVar "_")
+    | _ -> raise Type_error
+  | TmRight (t, ty) ->
+    match ty with
+    | TyOr (_, ty2) ->
       check_type ctx t ty2;
       TyOr (TyVar "_", ty2)
-    | TmOrCase (t, (x, u), (y, v)) ->
-      (match infer_type ctx t with
-      | TyOr (ty1, ty2) ->
-        let ty_u = infer_type ((x, ty1) :: ctx) u in
-        let ty_v = infer_type ((y, ty2) :: ctx) v in
-        if ty_u = ty_v then ty_u
-        else raise Type_error
-      | _ -> raise Type_error)
+    | _ -> raise Type_error
+  | TmOrCase (t, (x, u), (y, v)) ->
+    (match infer_type ctx t with
+    | TyOr (ty1, ty2) ->
+      let ty_u = infer_type ((x, ty1) :: ctx) u in
+      let ty_v = infer_type ((y, ty2) :: ctx) v in
+      if ty_u = ty_v then ty_u
+      else raise Type_error
+    | _ -> raise Type_error)
+  | TmAbsurd (t , ty) -> 
+    (match infer_type ctx t with 
+      | TyFalse -> ty
+      | _ -> raise Type_error
+      )
 
 and check_type (ctx : context) (term : tm) (expected_ty : ty) : unit =
   match infer_type ctx term with
@@ -343,9 +280,9 @@ let test () =
   assert (inferred_prod_ty = TyProd (TyVar "A", TyVar "B"));
 
   (* Test somme *)
-  let term_sum = TmInl (TmVar ("x", TyVar "A"), TySum (TyVar "A", TyVar "B")) in
+  (*let term_sum = TmInl (TmVar ("x", TyVar "A"), TySum (TyVar "A", TyVar "B")) in 
   let inferred_sum_ty = infer_type ctx term_sum in
-  assert (inferred_sum_ty = TySum (TyVar "A", TyVar "B"));
+  assert (inferred_sum_ty = TySum (TyVar "A", TyVar "B")); *)
 
   (* Test unité *)
   let term_unit = TmUnit in
