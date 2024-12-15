@@ -137,6 +137,7 @@ let check_type (ctx : context) (term : tm) (expected_ty : ty) : unit =
 
 *)
 
+
 (* 1.7 Other connectives *)
 
 (* Types étendus *)
