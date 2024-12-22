@@ -135,19 +135,18 @@ let rec infer_type (ctx : context) (t : tm) : ty =
       (match infer_type ctx t with
        | TyProd (_, ty2) -> ty2
        | _ -> raise Type_error)
-  (*)     
-  | TmInl (t, ty) ->
-    match ty with
+  (* | TmInl (t, ty) ->
+    (match ty with
     | TySum (ty1, ty2) -> 
       check_type ctx t ty1;
       TySum (ty1, ty2)
-    | _ -> raise Type_error
-  | TmInr (t, ty) ->
-    match ty with 
+    | _ -> raise Type_error) *)
+  (*| TmInr (t, ty) ->
+    (match ty with 
     | TySum (ty1, ty2) ->
       check_type ctx t ty2;
       TySum (ty1, ty2)
-    | _ -> raise Type_error *)
+    | _ -> raise Type_error)*)
   | TmCase (t, (x, u), (y, v)) ->
       (match infer_type ctx t with
        | TySum (ty1, ty2) ->
@@ -182,17 +181,17 @@ let rec infer_type (ctx : context) (t : tm) : ty =
          | TyFalse -> ty
          | _ -> raise Type_error)
   | TmLeft (t, ty) ->
-    match ty with
+    (match ty with
     | TyOr (ty1, _) ->
       check_type ctx t ty1;
       TyOr (ty1, TyVar "_")
-    | _ -> raise Type_error
+    | _ -> raise Type_error)
   | TmRight (t, ty) ->
-    match ty with
-    | TyOr (_, ty2) ->
+    (match ty with
+    | TyOr (_ , ty2) ->
       check_type ctx t ty2;
       TyOr (TyVar "_", ty2)
-    | _ -> raise Type_error
+    | _ -> raise Type_error)
   | TmOrCase (t, (x, u), (y, v)) ->
     (match infer_type ctx t with
     | TyOr (ty1, ty2) ->
@@ -200,12 +199,12 @@ let rec infer_type (ctx : context) (t : tm) : ty =
       let ty_v = infer_type ((y, ty2) :: ctx) v in
       if ty_u = ty_v then ty_u
       else raise Type_error
-    | _ -> raise Type_error)
+    | _ -> raise Type_error) 
   | TmAbsurd (t , ty) -> 
-    (match infer_type ctx t with 
+    match infer_type ctx t with 
       | TyFalse -> ty
       | _ -> raise Type_error
-      )
+      
 
 and check_type (ctx : context) (term : tm) (expected_ty : ty) : unit =
   match infer_type ctx term with
@@ -312,3 +311,46 @@ let test () =
   assert (inferred_neg_ty = TyArrow (TyAnd (TyVar "A", TyArrow (TyVar "A", TyFalse)), TyVar "B"))
 
 (* You can run the test with let() = test () *)
+
+(* 1.12 Parsing strings *)
+
+let () =
+  let l = [
+    "A => B";
+    "A ⇒ B";
+    "A /\\ B";
+    "A ∧ B";
+    "T";
+    "A \\/ B";
+    "A ∨ B";
+    "_";
+    "not A";
+    "¬ A";
+  ]
+  in
+  List.iter
+    (fun s ->
+       Printf.printf
+         "the parsing of %S is %s\n%!" s (string_of_ty (ty_of_string s))
+    ) l
+
+let () =
+let l = [
+  "t u v";
+  "fun (x : A) -> t";
+  "λ (x : A) → t";
+  "(t , u)";
+  "fst(t)";
+  "snd(t)";
+  "()";
+  "case t of x -> u | y -> v";
+  "left(t,B)";
+  "right(A,t)";
+  "absurd(t,A)"
+]
+in
+List.iter
+  (fun s ->
+      Printf.printf
+        "the parsing of %S is %s\n%!" s (string_of_tm (tm_of_string s))
+  ) l

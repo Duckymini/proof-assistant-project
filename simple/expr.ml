@@ -59,7 +59,7 @@ let rec string_of_ty ty =
   | TyAnd (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " ∧ " ^ string_of_ty ty2 ^ ")"
   | TyTrue -> "⊤"
   | TyFalse -> "⊥"
-  | TyOr (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " \\/ " ^ string_of_ty ty2 ^ ")"
+  | TyOr (ty1, ty2) -> "(" ^ string_of_ty ty1 ^ " ∨ " ^ string_of_ty ty2 ^ ")"
   
 let rec string_of_tm tm =
   match tm with
