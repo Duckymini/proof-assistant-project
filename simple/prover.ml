@@ -335,22 +335,147 @@ let () =
     ) l
 
 let () =
-let l = [
-  "t u v";
-  "fun (x : A) -> t";
-  "λ (x : A) → t";
-  "(t , u)";
-  "fst(t)";
-  "snd(t)";
-  "()";
-  "case t of x -> u | y -> v";
-  "left(t,B)";
-  "right(A,t)";
-  "absurd(t,A)"
-]
-in
-List.iter
-  (fun s ->
-      Printf.printf
-        "the parsing of %S is %s\n%!" s (string_of_tm (tm_of_string s))
-  ) l
+  let l = [
+    "t u v";
+    "fun (x : A) -> t";
+    "λ (x : A) → t";
+    "(t , u)";
+    "fst(t)";
+    "snd(t)";
+    "()";
+    "case t of x -> u | y -> v";
+    "left(t,B)";
+    "right(A,t)";
+    "absurd(t,A)"
+  ]
+  in
+  List.iter
+    (fun s ->
+        Printf.printf
+          "the parsing of %S is %s\n%!" s (string_of_tm (tm_of_string s))
+    ) l
+
+(* 2.1 String representation of contexts *)
+
+let string_of_ctx (ctx : (string * ty) list) : string =
+  "[" ^
+  (ctx
+   |> List.map (fun (var, ty) -> var ^ " : " ^ string_of_ty ty)
+   |> String.concat ", ") ^
+  "]"
+
+(* 2.2 Sequents *)
+
+type sequent = context * ty
+
+let string_of_seq (ctx, ty) : string =
+  string_of_ctx ctx ^ " ⊢ " ^ string_of_ty ty
+
+(* 2.3 An interactive prover *)
+
+let rec prove env a =
+  print_endline (string_of_seq (env, a));
+  print_string "? "; flush_all ();
+  let error e = print_endline e; prove env a in
+  let cmd, arg =
+    let cmd = input_line stdin in
+    let n = try String.index cmd ' ' with Not_found -> String.length cmd in
+    let c = String.sub cmd 0 n in
+    let a = String.sub cmd n (String.length cmd - n) in
+    let a = String.trim a in
+    c, a
+  in
+  match cmd with
+  | "intro" ->
+     (match a with
+      | TyArrow (a, b) ->
+        if arg = "" then error "Please provide an argument for intro."
+        else
+          let x = arg in
+          let t = prove ((x, a) :: env) b in
+          TmAbs (x, a, t)
+      | _ ->
+        error "Don't know how to introduce this.")
+  | "exact" ->
+     let t = tm_of_string arg in
+     if infer_type env t <> a then error "Not the right type."
+     else t
+  | "elim" ->
+     let t = tm_of_string arg in
+     let ty = infer_type env t in
+     (match ty with
+      | TyArrow (a, _) ->
+        let u = prove env a in
+        TmApp (t, u)
+      | _ -> error "The given term is not of the form A -> B")
+  | cmd -> error ("Unknown command: " ^ cmd)
+  
+let prove_from_file filename =
+  let infile = open_in filename in
+  try
+    let a = input_line infile in
+    let a = ty_of_string a in
+    print_endline ("Verifying the proof for: " ^ string_of_ty a);
+    let rec process_file env a =
+      try
+        let line = input_line infile in
+        let cmd, arg =
+          let n = try String.index line ' ' with Not_found -> String.length line in
+          let c = String.sub line 0 n in
+          let a = String.sub line n (String.length line - n) in
+          let a = String.trim a in
+          c, a
+        in
+        match cmd with
+        | "intro" ->
+          (match a with
+           | TyArrow (a, b) ->
+             let x = arg in
+             process_file ((x, a) :: env) b
+           | _ -> failwith "Intro rule applied to a non-arrow type")
+        | "exact" ->
+          let t = tm_of_string arg in
+          if infer_type env t <> a then failwith "Exact: Not the right type."
+          else print_endline "Exact step verified."
+        | "elim" ->
+          let t = tm_of_string arg in
+          let ty = infer_type env t in
+          (match ty with
+           | TyArrow (a, _) ->
+             let u = prove env a in
+             let _ = TmApp (t, u) in
+             print_endline "Elim step verified."
+           | _ -> failwith "Elim: The given term is not of the form A -> B")
+        | cmd -> failwith ("Unknown command in file: " ^ cmd)
+      with End_of_file ->
+        print_endline "Proof verification complete.";
+    in
+    process_file [] a;
+    close_in infile;
+    print_endline "The proof is correct."
+  with e ->
+    close_in_noerr infile;
+    print_endline ("Error while verifying the proof: " ^ Printexc.to_string e)
+
+let () =
+  print_endline "Do you want to test a file or prove a formula? (type 'file' or 'formula')";
+  let choice = input_line stdin in
+  if choice = "file" then (
+    print_endline "Enter the file name:";
+    let filename = input_line stdin in
+    prove_from_file filename
+  ) else if choice = "formula" then (
+    print_endline "Please enter the formula to prove:";
+    let a = input_line stdin in
+    let a = ty_of_string a in
+    print_endline "Let's prove it.";
+    let t = prove [] a in
+    print_endline "done.";
+    print_endline "Proof term is";
+    print_endline (string_of_tm t);
+    print_string "Typechecking... "; flush_all ();
+    assert (infer_type [] t = a);
+    print_endline "ok."
+  ) else (
+    print_endline "Unknown choice. Exiting."
+  )

@@ -2,3 +2,23 @@ A => B => A
 intro x
 intro y
 exact x
+
+(A => B) => A => B
+intro f
+intro x
+elim f
+exact x
+
+(A => B) => (B => C) => A => C
+intro f
+intro g
+intro x
+elim g
+elim f
+exact x
+
+((A => A) => B) => B
+intro f
+elim f
+intro x
+exact x

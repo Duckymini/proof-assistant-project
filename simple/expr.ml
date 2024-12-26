@@ -88,3 +88,5 @@ let rec string_of_tm tm =
   | TmLeft (tm, ty) -> "inl " ^ string_of_tm tm ^ " : " ^ string_of_ty ty
   | TmRight (tm, ty) -> "inr " ^ string_of_tm tm ^ " : " ^ string_of_ty ty
   | TmAbsurd (tm, ty) -> "absurd(" ^ string_of_tm tm ^ " : " ^ string_of_ty ty ^ ")"
+
+
